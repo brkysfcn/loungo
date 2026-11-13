@@ -1,0 +1,7 @@
+ads.example
+doubleclick.net
+googlesyndication.com
+adservice.google.com
+popads.net
+propellerads.com
+exoclick.com

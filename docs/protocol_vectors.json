@@ -1,0 +1,32 @@
+[
+  {
+    "name": "move dx=1 dy=-1",
+    "kind": "move",
+    "fields": { "dx": 1, "dy": -1 },
+    "hex": "010100ffff"
+  },
+  {
+    "name": "scroll sx=0 sy=300",
+    "kind": "scroll",
+    "fields": { "sx": 0, "sy": 300 },
+    "hex": "0200002c01"
+  },
+  {
+    "name": "button state=1 btn=0",
+    "kind": "button",
+    "fields": { "down": true, "btn": 0 },
+    "hex": "030100"
+  },
+  {
+    "name": "thumb reqId=258 jpeg=ffd8",
+    "kind": "thumb",
+    "fields": { "reqId": 258, "jpegHex": "ffd8" },
+    "hex": "200201ffd8"
+  },
+  {
+    "name": "move dx=-32768 dy=32767",
+    "kind": "move",
+    "fields": { "dx": -32768, "dy": 32767 },
+    "hex": "010080ff7f"
+  }
+]

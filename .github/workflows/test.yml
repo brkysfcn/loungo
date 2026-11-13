@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Run Android Unit Tests
+        run: ./gradlew testBetaDebugUnitTest testStableDebugUnitTest -PskipPwa
+
+  pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: pwa/package-lock.json
+      - name: Install dependencies
+        run: cd pwa && npm ci
+      - name: Run PWA Vitest
+        run: cd pwa && npx vitest run

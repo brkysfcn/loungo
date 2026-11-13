@@ -1,0 +1,101 @@
+name: Release
+
+# Builds the signed stable APK in GitHub Actions with the upload key stored as repository
+# secrets, so a release does not need the key on a local machine.
+# - Push a tag `vX.Y.Z` -> GitHub release with the APK (sideload) and the AAB (Google Play)
+#   and the CHANGELOG section as notes.
+# - Run manually (workflow_dispatch) -> build only; the APK is attached to the run as an artifact.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+
+      - name: Install PWA dependencies
+        run: npm ci
+        working-directory: pwa
+
+      - name: Restore upload key
+        env:
+          KEYSTORE_B64: ${{ secrets.PHANTOM_KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/phantom-upload.jks"
+
+      - name: Build signed stable APK
+        env:
+          ORG_GRADLE_PROJECT_PHANTOM_STORE_FILE: ${{ runner.temp }}/phantom-upload.jks
+          ORG_GRADLE_PROJECT_PHANTOM_STORE_PASSWORD: ${{ secrets.PHANTOM_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_PHANTOM_KEY_ALIAS: ${{ secrets.PHANTOM_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_PHANTOM_KEY_PASSWORD: ${{ secrets.PHANTOM_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleStableRelease bundleStableRelease
+
+      - name: Name, verify and checksum the APK
+        id: apk
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          APK="loungo-$VERSION.apk"
+          cp app/build/outputs/apk/stable/release/app-stable-release.apk "$APK"
+          cp app/build/outputs/bundle/stableRelease/app-stable-release.aab "loungo-$VERSION.aab"
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | grep "certificate DN"
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1 | tr a-f A-F)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          echo "aab=loungo-$VERSION.aab" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP/phantom-upload.jks"
+
+      - name: Attach APK to the run (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: loungo-${{ steps.apk.outputs.version }}
+          path: |
+            ${{ steps.apk.outputs.apk }}
+            ${{ steps.apk.outputs.aab }}
+
+      - name: Create GitHub release (tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          APK: ${{ steps.apk.outputs.apk }}
+          AAB: ${{ steps.apk.outputs.aab }}
+          SHA: ${{ steps.apk.outputs.sha }}
+        run: |
+          # Notes = this version's CHANGELOG section + install line + checksum.
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {on=1; next}
+            on && /^## \[/ {exit}
+            on {print}
+          ' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "### Install"
+            echo "\`$APK\` (Android TV 12+, ARM): \`adb install -r $APK\`. Updates 0.9.x in place; pairing and favorites are kept."
+            echo
+            echo "SHA-256: \`$SHA\`"
+          } >> notes.md
+          gh release create "$GITHUB_REF_NAME" "$APK" "$AAB" --title "Loungo $VERSION (beta)" --notes-file notes.md --prerelease

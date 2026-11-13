@@ -1,0 +1,30 @@
+# Android
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+*.apk
+*.aab
+.cxx/
+
+# Node
+node_modules/
+dist/
+
+# Diğer
+app/src/main/assets/pwa/
+spikes/**/build/
+*.log
+tools/adblock/hosts.txt
+.DS_Store
+Thumbs.db
+
+# acil kanal durum dosyasi
+tools/.acil_seen
+tools/scenarios/*.local.txt
+
+# verify.ps1 outputs (regenerated on each run)
+docs/reports/*
+!docs/reports/.gitkeep

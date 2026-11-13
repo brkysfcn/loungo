@@ -1,0 +1,52 @@
+/* PhantomBrowser Generic Adblock CSS */
+ins.adsbygoogle,
+[id^="google_ads_"],
+[id^="div-gpt-ad"],
+[id^="gpt_unit_"],
+iframe[src*="doubleclick.net"],
+iframe[src*="googlesyndication.com"],
+iframe[src*="adservice.google"],
+[class*="ad-container"],
+[class*="ad-wrapper"],
+[class*="ad-banner"],
+[class*="ad-slot"],
+[class*="ad_wrapper"],
+[class*="ad_container"],
+[class*="ad_banner"],
+[class*="ad_slot"],
+.ad-slot,
+[data-ad-slot],
+[data-ad-unit],
+[data-ad-name],
+[data-ad-client],
+amp-ad,
+amp-embed[type="taboola"],
+amp-embed[type="outbrain"],
+.taboola,
+[id^="taboola-"],
+.OUTBRAIN,
+[id^="outbrain-"],
+.rh-reklam,
+.rh-reklam-alani,
+.reklam-alani,
+.reklam-alani-wrapper,
+.reklam-kutusu,
+.reklam-bandi,
+.hurriyet-ad,
+.ad-billboard,
+.ad-leaderboard,
+.ad-interstitial,
+.ad-sticky,
+.ad-box,
+[data-ad],
+[id^="reklam_"],
+[id^="reklam-"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

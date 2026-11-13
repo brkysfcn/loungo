@@ -1,0 +1,10 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<style>body{background:#111;color:#fff;font:24px sans-serif;padding:40px}select{font-size:24px;width:400px;height:60px}</style>
+</head><body>
+<select id="s" style="position:absolute;left:100px;top:100px">
+<option>Bir</option><option>Iki</option><option>Uc</option><option>Dort</option><option>Bes</option>
+</select>
+<p id="out" style="margin-top:160px">secilen: Bir</p>
+<script>document.getElementById('s').addEventListener('change',function(e){document.getElementById('out').textContent='secilen: '+e.target.value;});</script>
+</body></html>

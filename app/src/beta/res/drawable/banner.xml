@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <!-- Dark Outer Frame -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M0,0h320v180h-320z"/>
+    <!-- Orange Body -->
+    <path
+        android:fillColor="#FF6D00"
+        android:pathData="M16,16h288v148h-288z"/>
+    <!-- Dark Central Badge -->
+    <path
+        android:fillColor="#111111"
+        android:pathData="M40,40h240v100h-240z"/>
+    <!-- Letters T E S T in Amber/Yellow -->
+    <!-- T -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M65,65 h40 v12 h-14 v38 h-12 v-38 h-14 z"/>
+    <!-- E -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M115,65 h38 v12 h-24 v8 h20 v10 h-20 v8 h24 v12 h-38 z"/>
+    <!-- S -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M165,65 h38 v12 h-24 v8 h24 v26 h-38 v-12 h24 v-6 h-24 z"/>
+    <!-- T -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M215,65 h40 v12 h-14 v38 h-12 v-38 h-14 z"/>
+    <!-- Diagonal Corner Caution Ribbons -->
+    <path
+        android:fillColor="#FFD600"
+        android:pathData="M230,0 L320,90 L320,0 Z"/>
+    <path
+        android:fillColor="#D50000"
+        android:pathData="M260,0 L320,60 L320,0 Z"/>
+    <!-- Bottom Orange Stripe -->
+    <path
+        android:fillColor="#FFAB00"
+        android:pathData="M16,140h288v24h-288z"/>
+</vector>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Olay Kaydedici Test Sayfası</title>
+<style>
+  body {
+    width: 100%;
+    min-height: 2500px;
+    margin: 0;
+    padding: 10px 20px;
+    font-family: sans-serif;
+    background-color: #121212;
+    color: #ffffff;
+    box-sizing: border-box;
+  }
+  h1 { font-size: 24px; margin: 5px 0 10px 0; }
+  .section {
+    margin-bottom: 10px;
+    padding: 10px 15px;
+    background: #1e1e1e;
+    border-radius: 8px;
+    border: 1px solid #333;
+  }
+  h2 { font-size: 18px; margin: 0 0 5px 0; }
+  a#hoverLink {
+    display: inline-block;
+    font-size: 20px;
+    color: #4da6ff;
+    text-decoration: none;
+    padding: 8px 16px;
+    background: #2a2a2a;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+  }
+  a#hoverLink:hover {
+    background: #4da6ff;
+    color: #000000;
+  }
+  button#testBtn {
+    font-size: 20px;
+    padding: 8px 20px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button#testBtn:hover {
+    background: #218838;
+  }
+  input[type="text"] {
+    width: 400px;
+    font-size: 18px;
+    padding: 6px;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    color: white;
+    border-radius: 6px;
+    display: block;
+  }
+  input[type="range"] {
+    width: 400px;
+    height: 24px;
+    display: block;
+  }
+  #scrollDiv {
+    width: 500px;
+    height: 90px;
+    overflow-y: scroll;
+    background: #222;
+    border: 1px solid #444;
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 6px;
+  }
+  #scrollContent {
+    height: 600px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Olay Kaydedici Test Sayfası</h1>
+
+<div class="section">
+  <h2>Hover Link</h2>
+  <a href="#" id="hoverLink">Hover Link</a>
+</div>
+
+<div class="section">
+  <h2>Buton</h2>
+  <button id="testBtn">Test Butonu</button>
+</div>
+
+<div class="section">
+  <h2>Input</h2>
+  <input id="testInput" type="text" placeholder="Metin yazın...">
+</div>
+
+<div class="section">
+  <h2>Range Sürükleme</h2>
+  <input id="testRange" type="range" min="0" max="100" value="50">
+</div>
+
+<div class="section">
+  <h2>Kaydırılabilir Alan (scrollDiv)</h2>
+  <div id="scrollDiv">
+    <div id="scrollContent">
+      <p>Satır 1</p><p>Satır 2</p><p>Satır 3</p><p>Satır 4</p><p>Satır 5</p>
+      <p>Satır 6</p><p>Satır 7</p><p>Satır 8</p><p>Satır 9</p><p>Satır 10</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  console.log('READY events');
+  const rects = {};
+  ['hoverLink', 'testBtn', 'testInput', 'testRange', 'scrollDiv'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      rects[id] = {
+        x: Math.round(r.left + r.width / 2),
+        y: Math.round(r.top + r.height / 2),
+        left: Math.round(r.left),
+        top: Math.round(r.top),
+        width: Math.round(r.width),
+        height: Math.round(r.height)
+      };
+    }
+  });
+  console.log('RECT ' + JSON.stringify(rects));
+
+  const throttledEvents = new Map();
+  const throttleInterval = 100;
+
+  function logEvent(e) {
+    if (e.type === 'mousemove' || e.type === 'pointermove') {
+      const last = throttledEvents.get(e.type) || 0;
+      const now = Date.now();
+      if (now - last < throttleInterval) return;
+      throttledEvents.set(e.type, now);
+    }
+
+    const targetId = e.target && e.target.id ? e.target.id : (e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '');
+    const data = {
+      t: e.type,
+      x: e.clientX !== undefined ? Math.round(e.clientX) : 0,
+      y: e.clientY !== undefined ? Math.round(e.clientY) : 0,
+      b: e.buttons !== undefined ? e.buttons : 0,
+      btn: e.button !== undefined ? e.button : 0,
+      pt: e.pointerType || 'mouse',
+      el: targetId
+    };
+    console.log('EV ' + JSON.stringify(data));
+  }
+
+  const eventsList = [
+    'pointermove', 'pointerover', 'pointerdown', 'pointerup',
+    'mousemove', 'mouseover', 'mousedown', 'mouseup',
+    'click', 'wheel', 'focus'
+  ];
+
+  eventsList.forEach(eventType => {
+    const useCapture = (eventType === 'focus');
+    window.addEventListener(eventType, logEvent, useCapture);
+  });
+
+  // Range input value listener
+  const testRange = document.getElementById('testRange');
+  if (testRange) {
+    testRange.addEventListener('input', (e) => {
+      console.log('EV ' + JSON.stringify({ t: 'input', el: 'testRange', value: testRange.value }));
+    });
+    testRange.addEventListener('change', (e) => {
+      console.log('EV ' + JSON.stringify({ t: 'change', el: 'testRange', value: testRange.value }));
+    });
+  }
+
+  // Inner div scroll
+  const scrollDiv = document.getElementById('scrollDiv');
+  if (scrollDiv) {
+    scrollDiv.addEventListener('scroll', () => {
+      console.log('EV ' + JSON.stringify({ t: 'scroll', el: 'scrollDiv', scrollTop: Math.round(scrollDiv.scrollTop) }));
+    });
+  }
+
+  // Window scroll with 100ms debounce
+  let scrollDebounceTimer = null;
+  window.addEventListener('scroll', () => {
+    if (scrollDebounceTimer) clearTimeout(scrollDebounceTimer);
+    scrollDebounceTimer = setTimeout(() => {
+      console.log('EV ' + JSON.stringify({ t: 'scroll', scrollY: Math.round(window.scrollY) }));
+    }, 100);
+  });
+</script>
+
+</body>
+</html>

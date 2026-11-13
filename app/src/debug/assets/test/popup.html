@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Popup Test Page</title>
+    <style>
+        body { font-size: 20px; padding: 20px; background: #222; color: #fff; }
+        button, a { display: block; margin: 15px 0; font-size: 20px; padding: 10px 20px; color: #0a84ff; }
+    </style>
+</head>
+<body>
+    <h1>Popup Spike Test Page</h1>
+    <button id="btn1" onclick="window.open('https://example.com')">1. window.open(example.com)</button>
+    <button id="btn2" onclick="fetch('https://appassets.androidplatform.net/assets/test/child.html').then(() => window.open('https://example.com'))">2. fetch then window.open</button>
+    <a id="link3" href="https://example.com" target="_blank">3. Target Blank Link</a>
+    <button id="btn4" onclick="setTimeout(() => window.open('https://example.com'), 2000)">4. setTimeout window.open (2s)</button>
+    <button id="btn5" onclick="window.open('https://ads.example/x')">5. window.open(ads.example)</button>
+    <button id="btn6" onclick="window.open('https://appassets.androidplatform.net/assets/test/child.html')">6. window.open(child.html)</button>
+
+    <hr>
+    <h3>Blocked Schemes Test Links:</h3>
+    <a id="intentLink" href="intent://x#Intent;scheme=x;end">Intent Link (Blocked)</a>
+    <a id="marketLink" href="market://details?id=x">Market Link (Blocked)</a>
+
+    <script>
+        window.addEventListener('message', (e) => {
+            console.log('OPENER_MSG ' + e.data);
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const ids = ['btn1', 'btn2', 'link3', 'btn4', 'btn5', 'btn6', 'intentLink', 'marketLink'];
+            const rects = {};
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    const r = el.getBoundingClientRect();
+                    rects[id] = { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) };
+                }
+            });
+            console.log('RECT ' + JSON.stringify(rects));
+        });
+    </script>
+</body>
+</html>

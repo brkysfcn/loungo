@@ -81,15 +81,26 @@ class RemoteActivity : Activity() {
         window.navigationBarColor = BG
         container = FrameLayout(this).apply { setBackgroundColor(BG) }
         // Android 15 draws edge to edge: keep content clear of the bars and the keyboard.
-        container.setOnApplyWindowInsetsListener { v, insets ->
-            val i = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
-            v.setPadding(i.left, i.top, i.right, i.bottom)
-            WindowInsets.CONSUMED // the remote page must not add its own safe-area padding on top
-        }
+        container.setOnApplyWindowInsetsListener { v, insets -> applyInsets(v, insets) }
         infoRoot = buildInfoScreen()
         container.addView(infoRoot)
         setContentView(container)
     }
+
+    /** Pads [v] clear of the bars and the keyboard; the remote page must not add its own safe-area padding on top. */
+    private fun applyInsets(v: View, insets: WindowInsets): WindowInsets =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val i = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+            v.setPadding(i.left, i.top, i.right, i.bottom)
+            WindowInsets.CONSUMED
+        } else {
+            // Android 10: no edge-to-edge, system window insets already include the keyboard.
+            @Suppress("DEPRECATION")
+            v.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop,
+                insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+            @Suppress("DEPRECATION")
+            insets.consumeSystemWindowInsets()
+        }
 
     override fun onStart() {
         super.onStart()

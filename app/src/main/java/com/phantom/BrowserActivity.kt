@@ -70,6 +70,18 @@ private const val FOCUS_SCRIPT = """
     var isTop = (window.self === window.top);
     var reportedMediaUrls = {};
 
+    // Recognises a manifest by its body, whatever the URL looks like (many CDNs use URLs
+    // without .m3u8/.mpd). Returns 'hls-master', 'hls', 'dash' or null.
+    function manifestKind(text) {
+        if (!text) return null;
+        if (text.indexOf('#EXTM3U') === 0) {
+            return text.indexOf('#EXT-X-STREAM-INF') !== -1 ? 'hls-master' : 'hls';
+        }
+        var head = text.substring(0, 1024);
+        if (head.indexOf('<MPD') !== -1 && head.indexOf('urn:mpeg:dash') !== -1) return 'dash';
+        return null;
+    }
+
     function reportMedia(url, kind) {
         if (!url || typeof url !== 'string') return;
         if (reportedMediaUrls[url]) return;
@@ -148,9 +160,8 @@ private const val FOCUS_SCRIPT = """
                                 var targetUrl = res.url || (typeof input === 'string' ? input : (input && input.url ? input.url : ''));
                                 if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0)) {
                                     res.clone().text().then(function(text) {
-                                        if (text && text.indexOf('#EXTM3U') === 0) {
-                                            reportMedia(targetUrl, text.indexOf('#EXT-X-STREAM-INF') !== -1 ? 'hls-master' : 'hls');
-                                        }
+                                        var k = manifestKind(text);
+                                        if (k) reportMedia(targetUrl, k);
                                     }).catch(function() {});
                                 }
                             }
@@ -179,13 +190,19 @@ private const val FOCUS_SCRIPT = """
                 try {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         var rType = xhr.responseType;
+                        var text = null;
                         if (!rType || rType === 'text') {
-                            var text = xhr.responseText;
-                            if (text && text.indexOf('#EXTM3U') === 0) {
-                                var targetUrl = xhr.responseURL || xhr.__phantomUrl;
-                                if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0)) {
-                                    reportMedia(targetUrl, text.indexOf('#EXT-X-STREAM-INF') !== -1 ? 'hls-master' : 'hls');
-                                }
+                            text = xhr.responseText;
+                        } else if (rType === 'document' && xhr.responseXML && xhr.responseXML.documentElement) {
+                            if (xhr.responseXML.documentElement.nodeName === 'MPD') text = '<MPD urn:mpeg:dash';
+                        } else if (rType === 'arraybuffer' && xhr.response && xhr.response.byteLength < 2097152 && window.TextDecoder) {
+                            text = new TextDecoder().decode(new Uint8Array(xhr.response, 0, Math.min(1024, xhr.response.byteLength)));
+                        }
+                        var k = manifestKind(text);
+                        if (k) {
+                            var targetUrl = xhr.responseURL || xhr.__phantomUrl;
+                            if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0)) {
+                                reportMedia(targetUrl, k);
                             }
                         }
                     }
@@ -909,9 +926,37 @@ class BrowserActivity : Activity() {
         }
     }
 
+    private fun checkWebViewVersionOnce() {
+        try {
+            val pkg = WebView.getCurrentWebViewPackage()
+            val verName = pkg?.versionName
+            val major = UnsupportedTvActivity.parseWebViewMajor(verName)
+            Log.i("PHANTOM", "WEBVIEW_VER version=${verName ?: "unknown"} major=${major ?: -1}")
+            if (major != null && major < 80) {
+                val prefs = getSharedPreferences("phantom_webview_notice", MODE_PRIVATE)
+                if (!prefs.getBoolean("webview_outdated_shown", false)) {
+                    prefs.edit().putBoolean("webview_outdated_shown", true).apply()
+                    Log.i("PHANTOM", "WEBVIEW_OUTDATED_SHOWN major=$major")
+                    android.app.AlertDialog.Builder(this)
+                        .setMessage(getString(R.string.webview_outdated))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("PHANTOM", "WEBVIEW_VER check failed: ${e.message}")
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!UnsupportedTvActivity.isSupported) {
+            // finish() inside onCreate skips onStart, so CoreService never starts (PhantomApplication).
+            startActivity(Intent(this, UnsupportedTvActivity::class.java))
+            finish()
+            return
+        }
 
         val root = FrameLayout(this)
         rootLayout = root
@@ -1086,6 +1131,7 @@ class BrowserActivity : Activity() {
         liteMode = com.phantom.web.LiteMode.load(this)
         startJankWatch()
         createAndConfigureWebView(lastUrl, deferLoad = onboardingDeferredLoad)
+        checkWebViewVersionOnce()
 
         Hub.sink = object : Hub.Sink {
             override fun onBinary(m: BinIn) {
@@ -1823,42 +1869,51 @@ class BrowserActivity : Activity() {
     }
 
     private fun openNativePlayer(url: String) {
-        val wv = webView
-        wv?.onPause()
-        wv?.pauseTimers()
-        val record = mediaDetector.getRecord(url)
-        val referer = record?.referer ?: wv?.url
-        val origin = record?.origin
-        val kind = record?.kind ?: com.phantom.web.kindOf(url)
-        val currentPage = cachedUrl.ifEmpty { wv?.url ?: "" }
-        val subList = com.phantom.web.resolveSubtitles(record, mediaDetector.getSubtitles(), currentPage)
-        val subsJson = org.json.JSONArray().apply {
-            subList.forEach { sub ->
-                put(JSONObject().apply {
-                    put("url", sub.url)
-                    put("lang", sub.lang)
-                    put("referer", sub.referer ?: referer)
-                })
+        Log.i("PHANTOM", "OPEN_NATIVE_PLAYER starting for $url")
+        try {
+            val wv = webView
+            wv?.onPause()
+            wv?.pauseTimers()
+            val record = mediaDetector.getRecord(url)
+            val referer = record?.referer ?: wv?.url
+            val origin = record?.origin
+            val kind = record?.kind ?: com.phantom.web.kindOf(url)
+            val currentPage = cachedUrl.ifEmpty { wv?.url ?: "" }
+            val subList = com.phantom.web.resolveSubtitles(record, mediaDetector.getSubtitles(), currentPage)
+            val subsJson = org.json.JSONArray().apply {
+                subList.forEach { sub ->
+                    put(JSONObject().apply {
+                        put("url", sub.url)
+                        put("lang", sub.lang)
+                        put("referer", sub.referer ?: referer)
+                    })
+                }
+            }.toString()
+            val intent = Intent(this@BrowserActivity, com.phantom.player.NativePlayerActivity::class.java).apply {
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_URL, url)
+                val pageUrl = record?.pageUrl ?: cachedUrl.ifEmpty { wv?.url ?: "" }
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_PAGE_URL, pageUrl)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_KIND, kind)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_REFERER, referer)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_ORIGIN, origin)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_SUBS, subsJson)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_USER_AGENT, wv?.settings?.userAgentString)
+                val cookie = android.webkit.CookieManager.getInstance().getCookie(url)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_COOKIE, cookie)
+                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_TITLE, cachedTitle.ifEmpty { wv?.title ?: "" })
+                mediaDetector.headersFor(url)?.let { h ->
+                    putExtra(com.phantom.player.NativePlayerActivity.EXTRA_HEADERS, JSONObject(h).toString())
+                }
             }
-        }.toString()
-        val intent = Intent(this@BrowserActivity, com.phantom.player.NativePlayerActivity::class.java).apply {
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_URL, url)
-            val pageUrl = record?.pageUrl ?: cachedUrl.ifEmpty { wv?.url ?: "" }
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_PAGE_URL, pageUrl)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_KIND, kind)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_REFERER, referer)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_ORIGIN, origin)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_SUBS, subsJson)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_USER_AGENT, wv?.settings?.userAgentString)
-            val cookie = android.webkit.CookieManager.getInstance().getCookie(url)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_COOKIE, cookie)
-            putExtra(com.phantom.player.NativePlayerActivity.EXTRA_TITLE, cachedTitle.ifEmpty { wv?.title ?: "" })
-            mediaDetector.headersFor(url)?.let { h ->
-                putExtra(com.phantom.player.NativePlayerActivity.EXTRA_HEADERS, JSONObject(h).toString())
-            }
+            isNativePlayerOpen = true
+            Log.i("PHANTOM", "OPEN_NATIVE_PLAYER startActivityForResult")
+            startActivityForResult(intent, REQUEST_CODE_PLAYER)
+        } catch (e: Exception) {
+            Log.e("PHANTOM", "OPEN_NATIVE_PLAYER_ERR", e)
+            isNativePlayerOpen = false
+            webView?.onResume()
+            webView?.resumeTimers()
         }
-        isNativePlayerOpen = true
-        startActivityForResult(intent, REQUEST_CODE_PLAYER)
     }
 
     private fun showTvMenu() {

@@ -4,6 +4,22 @@ All notable changes to this project. Dates are when the change reached the TV.
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-11-16
+
+### Changed
+- The TV app now runs on Android 9 and newer (was Android 12). When Android System WebView is older than version 80, a one-time notice suggests updating it from the Play Store.
+
+### Fixed
+- Extensionless DASH manifests (such as ok.ru streams) are now detected, and tiny placeholder MP4 files are ignored.
+- The phone's "Video found" banner now switches to a streaming manifest (HLS/DASH) found after a placeholder video, so playback no longer closes after a second.
+- If the native player fails to open, the page resumes instead of staying paused.
+
+## [0.9.10] - 2026-11-14
+
+### Changed
+- The phone remote now installs on Android 10 and newer (was Android 12). The TV browser still needs Android 12: on an older TV it shows a short notice and starts nothing.
+- The remote page also runs on the older WebView found on some Android 10 phones.
+
 ## [0.9.9] - 2026-11-13
 
 ### Changed

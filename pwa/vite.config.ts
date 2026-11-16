@@ -20,5 +20,8 @@ export default defineConfig({
   build: {
     outDir: '../app/src/main/assets/pwa',
     emptyOutDir: true,
+    // Android 10 phones may still run WebView 74 (no `??` / `?.`); the remote app shows this page.
+    target: ['es2019', 'chrome74', 'safari13'],
+    cssTarget: ['chrome74', 'safari13'],
   },
 });

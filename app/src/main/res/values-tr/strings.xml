@@ -114,5 +114,7 @@
     <string name="info_connect_title">Nasıl bağlanırım?</string>
     <string name="info_connect_1">1. Telefon ve TV aynı Wi-Fi ağında olsun.</string>
     <string name="info_connect_2">2. Loungo\'yu TV\'de açın. Bu ekran kendiliğinden kumandaya döner.</string>
+    <string name="tv_requires_android12">TV\'deki Loungo, Android 12 veya üstünü gerektirir.</string>
     <string name="remote_rate_limited">Çok fazla deneme oldu. Bir dakika sonra tekrar deneyin.</string>
+    <string name="webview_outdated">Android System WebView eski; bazı siteler düzgün çalışmayabilir. Play Store\'dan güncelleyin.</string>
 </resources>

@@ -131,15 +131,22 @@ class MediaDetector(private val onMediaFound: (record: MediaRecord) -> Unit) {
         reportedUrls.clear()
         pendingSubtitles.clear()
         hasMaster = false
+        hasManifest = false
     }
 
     // Once a master playlist (#EXT-X-STREAM-INF) is known for the page, its variant and
     // audio-only sub-playlists must not replace it: opening one gives sound without picture.
     @Volatile private var hasMaster = false
 
+    // Once a manifest (HLS/DASH) is known for the page, a plain MP4 seen afterwards is almost
+    // always a teaser, an ad or a placeholder clip and must not replace the film.
+    @Volatile private var hasManifest = false
+
     private fun announce(record: MediaRecord, isMaster: Boolean) {
         if (isMaster) hasMaster = true
         else if (hasMaster && record.kind == "hls") return
+        if (record.kind == "hls" || record.kind == "dash") hasManifest = true
+        else if (hasManifest && record.kind == "mp4") return
         onMediaFound(record)
     }
 

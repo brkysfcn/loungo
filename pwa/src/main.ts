@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { shouldReplaceMedia } from './media';
 const trStr = t();
 import './style.css';
 import { PhantomConnection, ConnectionState } from './conn';
@@ -340,6 +341,7 @@ mediaBanner.textContent = '▶  Video bulundu — Tam ekran oynat';
 
 let mediaBannerTimer: ReturnType<typeof setTimeout> | null = null;
 let currentMediaUrl: string | null = null;
+let currentMediaKind: string | null = null;
 let mediaShownForCurrentPage = false;
 let lastPageUrl = '';
 
@@ -1109,6 +1111,7 @@ const conn = new PhantomConnection({
       if (newUrl !== lastPageUrl) {
         lastPageUrl = newUrl;
         mediaShownForCurrentPage = false;
+        currentMediaKind = null;
         mediaBanner.style.display = 'none';
         if (mediaBannerTimer) clearTimeout(mediaBannerTimer);
       }
@@ -1175,9 +1178,13 @@ const conn = new PhantomConnection({
       isFullscreen = !!msg.on;
       updateButtonState(backBtn, canGoBack || isPopupOpen || isFullscreen);
     } else if (msg.t === 'media') {
-      if (!mediaShownForCurrentPage) {
-        mediaShownForCurrentPage = true;
+      const replace = shouldReplaceMedia(currentMediaKind, msg.kind);
+      if (replace) {
         currentMediaUrl = msg.url;
+        currentMediaKind = msg.kind;
+      }
+      if (!mediaShownForCurrentPage || replace) {
+        mediaShownForCurrentPage = true;
         mediaBanner.style.display = 'block';
         if (mediaBannerTimer) clearTimeout(mediaBannerTimer);
         mediaBannerTimer = setTimeout(() => {

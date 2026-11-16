@@ -1,11 +1,11 @@
 # Loungo: TV Browser
 
-[![Test](https://github.com/brkysfcn/loungo/actions/workflows/test.yml/badge.svg)](https://github.com/brkysfcn/loungo/actions/workflows/test.yml)
+[![Test](https://github.com/brkysfcn/tv-browser/actions/workflows/test.yml/badge.svg)](https://github.com/brkysfcn/tv-browser/actions/workflows/test.yml)
 
 A lightweight, fast web browser for **Android TV**, controlled from your phone or your TV remote.
 It finds video on any page and opens it in a native full-screen player with subtitles, audio-track and quality selection, and resume.
 
-> Status: beta, in closed testing on Google Play. Requires Android TV 12+ (TV) or Android 12+ (phone remote).
+> Status: private beta, being prepared for Google Play. Roadmap: [`docs/yol_haritasi.md`](docs/yol_haritasi.md).
 
 | Phone remote | Video found | TV menu (remote only) | Subtitles in the player |
 |---|---|---|---|
@@ -47,7 +47,7 @@ It finds video on any page and opens it in a native full-screen player with subt
 **Light by design**
 - The background service runs only while the app is open; the page stops in the background and the cursor loop sleeps when idle.
 - Light look: on weak TVs, a stuttering page gets its background blur turned off automatically (phone settings: Automatic / Always / Off).
-- Release APK ≈ 4.6 MB. Cold start ≈ 1 s and idle memory ≈ 82 MB on the TV emulator.
+- Release APK ≈ 4.4 MB. Cold start ≈ 1.2 s and idle memory ≈ 67 MB on the emulator; checked by `tools/budget.ps1`.
 - No analytics, no accounts. Everything stays on the local network.
 - English and Turkish UI.
 
@@ -71,6 +71,8 @@ The wire protocol is documented in [`docs/protocol.md`](docs/protocol.md). Share
 
 Requirements: JDK 17+ (Android Studio's JBR is fine), Android SDK 36, Node 20.
 
+Runs on: Phone and TV: Android 9+ (Android TV / Google TV and Android phones).
+
 ```bash
 ./gradlew assembleBetaDebug        # "Loungo TEST" (com.phantom.browser.test, port 8766)
 ./gradlew assembleStableRelease    # "Loungo" (com.phantom.browser, port 8765), signed
@@ -80,7 +82,7 @@ The Gradle build also builds the phone PWA into `app/src/main/assets/pwa/`. Add 
 
 **Flavors.** `stable` is the app you use day to day. `beta` installs next to it as **Loungo TEST** so tests never overwrite it.
 
-**Release signing.** Use your own key. Put these values in `~/.gradle/gradle.properties` (debug builds need none of this):
+**Release signing.** The release key is not in the repository. Put these values in `~/.gradle/gradle.properties`:
 
 ```properties
 PHANTOM_STORE_FILE=/path/to/phantom-upload.jks
@@ -89,6 +91,7 @@ PHANTOM_KEY_ALIAS=phantom
 PHANTOM_KEY_PASSWORD=...
 ```
 
+**Starting over on a new machine** (tools, signing key restore, TV connection, releases): see [`docs/GELISTIRME.md`](docs/GELISTIRME.md).
 
 ## Testing
 
@@ -97,33 +100,33 @@ PHANTOM_KEY_PASSWORD=...
 cd pwa && npx vitest run                    # PWA tests
 ```
 
-GitHub Actions runs both on every push.
+GitHub Actions runs both on every push. Device scenarios run on the emulator (`PhantomTV_API31`) or a TV:
+
+```powershell
+powershell -File tools/verify.ps1 -Device emu -Scenario media   # outputs go to docs/reports/
+powershell -File tools/budget.ps1                               # start time / memory / size limits
+```
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `app/` | Android app (Kotlin): the TV browser and the phone remote screen |
-| `pwa/` | Phone remote web page (Vite, TypeScript), served by the TV |
-| `tools/` | Brand image, ad-list and dev-client scripts |
-| `docs/` | Protocol, store texts and graphics |
+| `app/` | Android TV app (Kotlin) |
+| `pwa/` | Phone remote (Vite, TypeScript) |
+| `tools/` | Device verification, measurement, ad-list and dev-client scripts |
+| `spikes/` | Early experiments (kept for reference) |
+| `docs/` | Protocol, roadmap, publishing notes. `archive/` holds earlier test reports |
+| `PLAN.md` | Detailed plan and task list (Turkish) |
+| `cowork.md`, `acil.md` | Hand-off files between the planning and implementing AI agents (see `PLAN.md` §7) |
 
 ## Privacy
 
 The app collects no data. The phone talks to the TV directly on the local network, and pairing uses a per-TV token. "Report a problem" sends logs only when you share them yourself.
 
-## Contributing
-
-Issues and pull requests are welcome. By submitting a contribution you agree that it is licensed under GPL-3.0 **and** that the project owner may also distribute it under other terms (for example in the Google Play build).
-
-Please keep site-specific code out: Loungo solves things with general rules, not per-site lists.
-
 ## License
 
-Copyright © 2026 brkysfcn. Licensed under the [GNU General Public License v3.0](LICENSE).
-
-"Loungo" and the Loungo icon are not covered by the license; please use a different name and icon for your own builds.
+Copyright © 2026 brkysfcn. All rights reserved. This repository is private; no license is granted.
 
 ---
 
-**Türkçe özet:** Loungo, Android TV için hafif bir tarayıcı. Telefondan (Android uygulaması ya da iPhone'da QR ile açılan sayfa) veya TV kumandasından kontrol edilir. Sayfadaki videoyu bulup altyazı, ses dili ve kalite seçimiyle tam ekran oynatıcıda açar. GPL-3.0 lisanslıdır; katkılar memnuniyetle karşılanır.
+**Türkçe özet:** Loungo, Android TV için hafif bir tarayıcı. Telefondan ya da kumandadan kontrol edilir. Sayfadaki videoyu bulup altyazı, ses dili ve kalite seçimiyle tam ekran oynatıcıda açar. Ayrıntılı plan `PLAN.md`'de, yol haritası `docs/yol_haritasi.md`'de.

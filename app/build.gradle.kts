@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "com.phantom.browser"
-        minSdk = 31
+        minSdk = 28
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.9.9"
+        versionCode = 13
+        versionName = "0.9.11"
     }
 
     signingConfigs {

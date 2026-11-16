@@ -20,4 +20,11 @@ class TvPickTest {
 
     @Test fun severalTvsChoose() =
         assertEquals(TvPick.Decision.Choose(listOf(a, b)), TvPick.decide(listOf(a, b), "loungo-zzzz", 0, 900))
+
+    @Test fun parseWebViewMajor() {
+        assertEquals(69, com.phantom.UnsupportedTvActivity.parseWebViewMajor("69.0.3497.100"))
+        assertEquals(91, com.phantom.UnsupportedTvActivity.parseWebViewMajor("91.0.4472.114"))
+        assertEquals(null, com.phantom.UnsupportedTvActivity.parseWebViewMajor(null))
+        assertEquals(null, com.phantom.UnsupportedTvActivity.parseWebViewMajor(""))
+    }
 }

@@ -1,6 +1,7 @@
 package com.phantom.player
 
 import android.media.MediaCodecList
+import android.os.Build
 import androidx.media3.common.C
 import androidx.media3.common.Format
 
@@ -40,7 +41,13 @@ object QualityLabel {
         if (mime == null) return true
         return hwCache.getOrPut(mime) {
             MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
-                !info.isEncoder && info.isHardwareAccelerated &&
+                val isHw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    info.isHardwareAccelerated
+                } else {
+                    val name = info.name.lowercase()
+                    !name.startsWith("omx.google.") && !name.startsWith("c2.android.") && !name.startsWith("omx.ffmpeg.")
+                }
+                !info.isEncoder && isHw &&
                     info.supportedTypes.any { it.equals(mime, ignoreCase = true) }
             }
         }

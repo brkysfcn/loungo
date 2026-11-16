@@ -315,4 +315,24 @@ class MediaDetectorTest {
         org.junit.Assert.assertEquals("https://cdn.example/hls/film.mp4/txt/master.txt", found.last())
         org.junit.Assert.assertFalse(found.any { it.contains("sublist") })
     }
+
+    @Test
+    fun dashManifestWithoutExtensionReplacesPlaceholderMp4() {
+        // A site plays a 1 s placeholder clip, then loads the film as DASH from a URL with no
+        // extension (found by the page script from the response body).
+        val found = mutableListOf<String>()
+        val detector = MediaDetector { found.add(it.url) }
+        detector.inspectRequest("https://static.example/res/video/stub.mp4", null, "https://site.example/video/1")
+        detector.registerMedia("https://cdn.example/?expires=1&type=1&sig=x", "dash", "https://site.example/video/1")
+        org.junit.Assert.assertEquals("https://cdn.example/?expires=1&type=1&sig=x", found.last())
+
+        // Another MP4 seen after the manifest (teaser, ad) must not take its place.
+        detector.inspectRequest("https://ads.example/teaser.mp4", null, "https://site.example/video/1")
+        org.junit.Assert.assertEquals("https://cdn.example/?expires=1&type=1&sig=x", found.last())
+
+        // A new page starts clean.
+        detector.reset()
+        detector.inspectRequest("https://other.example/clip.mp4", null, "https://other.example/")
+        org.junit.Assert.assertEquals("https://other.example/clip.mp4", found.last())
+    }
 }

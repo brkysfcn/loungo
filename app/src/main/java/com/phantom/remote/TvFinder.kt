@@ -62,7 +62,7 @@ class TvFinder(
         try { nsd?.stopServiceDiscovery(l) } catch (_: Exception) {}
     }
 
-    @Suppress("DEPRECATION") // resolveService is the API available on Android 12 (minSdk 31)
+    @Suppress("DEPRECATION") // resolveService works on every supported version (minSdk 29)
     private fun resolveNext() {
         if (resolving || listener == null) return
         val info = queue.removeFirstOrNull() ?: return

@@ -115,4 +115,6 @@
     <string name="info_connect_1">1. Put the phone and the TV on the same Wi-Fi network.</string>
     <string name="info_connect_2">2. Open Loungo on the TV. This screen turns into the remote by itself.</string>
     <string name="remote_rate_limited">Too many attempts. Try again in a minute.</string>
+    <string name="tv_requires_android12">Loungo on the TV needs Android 12 or newer.</string>
+    <string name="webview_outdated">Android System WebView is old; some sites may not work properly. Update it from the Play Store.</string>
 </resources>

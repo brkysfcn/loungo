@@ -20,5 +20,12 @@ describe('PWA i18n tests', () => {
   it('formats parameterized strings in both languages', () => {
     expect(t('tr').adblockBlocked(5)).toBe('Bu sayfada 5 istek engellendi');
     expect(t('en').adblockBlocked(5)).toBe('5 requests blocked on this page');
+    expect(t('tr').minutesAgo(5)).toBe('5 dk önce');
+    expect(t('en').minutesAgo(5)).toBe('5 min ago');
+  });
+
+  it('has identical translation keys in tr and en', () => {
+    expect(Object.keys(t('tr')).sort()).toEqual(Object.keys(t('en')).sort());
+    expect(Object.keys(t('tr').onboarding).sort()).toEqual(Object.keys(t('en').onboarding).sort());
   });
 });

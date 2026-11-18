@@ -4,6 +4,19 @@ All notable changes to this project. Dates are when the change reached the TV.
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-11-18
+
+### Added
+- History on the phone remote (last 100 pages, stored on the phone).
+
+### Changed
+- Phone remote: the top bar has two rows, with the address on its own full-width, centered line.
+- Phone remote: "Clear history", "Reset pairing" and "Clear browsing data" ask for a second tap instead of showing the browser's confirm box.
+
+### Fixed
+- Pages no longer get video codecs this TV can only decode in software (for example AV1 on TVs without an AV1 chip). YouTube and similar sites fall back to a hardware codec, so video stops freezing and higher resolutions play.
+- Media detection reads only the start of downloaded files, so video segments no longer cost memory and CPU on the page.
+
 ## [0.9.11] - 2026-11-16
 
 ### Changed

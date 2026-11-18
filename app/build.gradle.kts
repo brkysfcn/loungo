@@ -11,8 +11,8 @@ android {
         applicationId = "com.phantom.browser"
         minSdk = 28
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.9.11"
+        versionCode = 14
+        versionName = "0.9.12"
     }
 
     signingConfigs {

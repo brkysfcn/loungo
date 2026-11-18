@@ -1,11 +1,15 @@
-import { t } from './i18n';
+import { t, getLang } from './i18n';
 import { shouldReplaceMedia } from './media';
+import { armConfirm } from './confirm';
 const trStr = t();
+// Match the page language to the UI language (uppercase headers use it: 'i' vs 'İ').
+document.documentElement.lang = getLang();
 import './style.css';
 import { PhantomConnection, ConnectionState } from './conn';
 import { Trackpad } from './trackpad';
 import { KeyboardManager } from './keyboard';
 import { FavoriteStore } from './favorites';
+import { HistoryStore, formatRelativeTime } from './history';
 import { PlayerPanel } from './player';
 import { createOnboarding, makeFullscreenButton, detectPlatform, isAndroid } from './onboarding';
 import { inApp, notifyApp } from './app';
@@ -19,6 +23,7 @@ const app = document.getElementById('app') || document.body;
 app.innerHTML = '';
 
 const favoriteStore = new FavoriteStore();
+const historyStore = new HistoryStore();
 
 // Load sensitivity from localStorage (0.5 to 3.0, default 1.0)
 const savedSensStr = localStorage.getItem('phantom_sensitivity');
@@ -45,6 +50,7 @@ const SVG_STOP = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" st
 const SVG_GEAR = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 const SVG_STAR_FILLED = '<svg width="22" height="22" viewBox="0 0 24 24" fill="#ffd60a" stroke="#ffd60a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
 const SVG_STAR_OUTLINE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+const SVG_CLOCK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
 
 // Navigation Controls Row
 const navRow = document.createElement('div');
@@ -88,7 +94,11 @@ urlInput.setAttribute('spellcheck', 'false');
 urlInput.placeholder = 'Adres veya arama yazın...';
 urlInput.style.flex = '1';
 urlInput.style.minWidth = '0';
-urlInput.style.height = '34px';
+urlInput.style.height = '38px';
+// Centered while showing the page address; left-aligned while typing.
+urlInput.style.textAlign = 'center';
+urlInput.addEventListener('focus', () => { urlInput.style.textAlign = 'left'; });
+urlInput.addEventListener('blur', () => { urlInput.style.textAlign = 'center'; });
 urlInput.style.padding = '0 10px';
 urlInput.style.background = '#222226';
 urlInput.style.border = '1px solid #38383e';
@@ -110,6 +120,15 @@ favBtn.innerHTML = SVG_STAR_OUTLINE;
 styleNavButton(favBtn);
 favBtn.style.padding = '4px 6px';
 
+// History button (clock)
+const historyBtn = document.createElement('button');
+historyBtn.id = 'btn-history';
+historyBtn.title = trStr.history;
+historyBtn.innerHTML = SVG_CLOCK;
+styleNavButton(historyBtn);
+historyBtn.style.padding = '4px 6px';
+historyBtn.style.opacity = '0.85';
+
 // Status dot
 const statusDot = document.createElement('span');
 statusDot.id = 'status-dot';
@@ -129,15 +148,25 @@ gearBtn.innerHTML = SVG_GEAR;
 gearBtn.title = 'Ayarlar';
 styleNavButton(gearBtn);
 
+// Two rows: buttons on top, the address on its own full-width row below (phones are narrow).
+const navSpacer = document.createElement('div');
+navSpacer.style.flex = '1';
 navRow.appendChild(backBtn);
 navRow.appendChild(fwdBtn);
 navRow.appendChild(reloadStopBtn);
-navRow.appendChild(urlInput);
+navRow.appendChild(navSpacer);
 navRow.appendChild(favBtn);
+navRow.appendChild(historyBtn);
 // Sekmeler kullanilmiyor (T36 iptal): sekme dugmesi gosterilmez.
 navRow.appendChild(statusDot);
 navRow.appendChild(gearBtn);
 navBar.appendChild(navRow);
+const urlRow = document.createElement('div');
+urlRow.style.display = 'flex';
+urlRow.style.width = '100%';
+urlRow.style.marginTop = '6px';
+urlRow.appendChild(urlInput);
+navBar.appendChild(urlRow);
 
 // Progress bar (thin line along bottom of nav bar)
 const progressBar = document.createElement('div');
@@ -165,31 +194,36 @@ statusBanner.style.display = 'none';
 statusBanner.textContent = 'Bağlantı yok — yeniden deneniyor';
 navBar.appendChild(statusBanner);
 
-// Favorites Dropdown
-const favDropdown = document.createElement('div');
-favDropdown.id = 'fav-dropdown';
-favDropdown.style.display = 'none';
-favDropdown.style.position = 'absolute';
-favDropdown.style.top = '100%';
-favDropdown.style.left = '8px';
-favDropdown.style.right = '8px';
-favDropdown.style.maxHeight = '280px';
-favDropdown.style.background = '#1c1c1e';
-favDropdown.style.border = '1px solid #38383e';
-favDropdown.style.borderRadius = '10px';
-favDropdown.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.7)';
-favDropdown.style.overflowY = 'auto';
-(favDropdown.style as any).webkitOverflowScrolling = 'touch';
-favDropdown.style.touchAction = 'pan-y';
-favDropdown.style.zIndex = '100';
-favDropdown.style.padding = '6px 0';
-favDropdown.style.marginTop = '4px';
+function createNavDropdown(id: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.id = id;
+  el.style.display = 'none';
+  el.style.position = 'absolute';
+  el.style.top = '100%';
+  el.style.left = '8px';
+  el.style.right = '8px';
+  el.style.maxHeight = '280px';
+  el.style.background = '#1c1c1e';
+  el.style.border = '1px solid #38383e';
+  el.style.borderRadius = '10px';
+  el.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.7)';
+  el.style.overflowY = 'auto';
+  (el.style as any).webkitOverflowScrolling = 'touch';
+  el.style.touchAction = 'pan-y';
+  el.style.zIndex = '100';
+  el.style.padding = '6px 0';
+  el.style.marginTop = '4px';
+  el.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+  });
+  return el;
+}
 
-favDropdown.addEventListener('mousedown', (e) => {
-  e.preventDefault();
-});
-
+// Favorites & History Dropdowns
+const favDropdown = createNavDropdown('fav-dropdown');
+const historyDropdown = createNavDropdown('history-dropdown');
 navBar.appendChild(favDropdown);
+navBar.appendChild(historyDropdown);
 
 // Top Safe Spacer (T28e: avoids iOS standalone status bar frosted glass blur)
 const isStandalone = !!(
@@ -764,11 +798,9 @@ resetBtn.style.fontSize = '14px';
 resetBtn.style.fontWeight = '600';
 resetBtn.style.cursor = 'pointer';
 
-resetBtn.addEventListener('click', () => {
-  if (confirm('Eşleşmeyi sıfırlamak istiyor musunuz? Mevcut bağlantı kesilecek.')) {
-    conn.sendJson({ t: 'reset_pair' });
-    closeSettings();
-  }
+armConfirm(resetBtn, trStr.tapAgain, () => {
+  conn.sendJson({ t: 'reset_pair' });
+  closeSettings();
 });
 
 resetSection.appendChild(resetBtn);
@@ -838,12 +870,18 @@ clearDataBtn.style.borderRadius = '8px';
 clearDataBtn.style.fontSize = '14px';
 clearDataBtn.style.fontWeight = '600';
 clearDataBtn.style.cursor = 'pointer';
-clearDataBtn.addEventListener('click', () => {
-  if (!confirm(trStr.clearConfirm)) return;
+armConfirm(clearDataBtn, trStr.tapAgain, () => {
   clearDataBtn.disabled = true;
+  historyStore.clear();
   conn.sendJson({ t: 'clear_data' });
 });
 reportSection.appendChild(clearDataBtn);
+const clearDataHint = document.createElement('div');
+clearDataHint.textContent = trStr.clearDataHint;
+clearDataHint.style.fontSize = '12px';
+clearDataHint.style.color = '#8e8e93';
+clearDataHint.style.lineHeight = '1.35';
+reportSection.appendChild(clearDataHint);
 modalCard.appendChild(reportSection);
 
 // Usage tips row (replays onboarding) + Android fullscreen button
@@ -900,6 +938,11 @@ let lastAppBack = 0;
   lastAppBack = now;
   if (settingsModal.style.display === 'flex') {
     closeSettings();
+    return true;
+  }
+  if (historyDropdown.style.display !== 'none' || favDropdown.style.display !== 'none') {
+    hideHistoryDropdown();
+    hideFavoritesDropdown();
     return true;
   }
   conn.sendJson({ t: 'back' });
@@ -1014,6 +1057,7 @@ let isLoading = false;
 let isPopupOpen = false;
 let isFullscreen = false;
 let canGoBack = false;
+let lastHistoryKey = '';
 
 function updateConnectionStatus(state: ConnectionState) {
   if (state !== 'invalid_token') {
@@ -1131,6 +1175,15 @@ const conn = new PhantomConnection({
       }
       if (currentUrl) {
         currentTitle = msg.title || currentTitle;
+      }
+      if (!isLoading && newUrl) {
+        const key = `${newUrl}\n${typeof msg.title === 'string' ? msg.title : ''}`;
+        if (key !== lastHistoryKey) {
+          lastHistoryKey = key;
+          historyStore.record(newUrl, typeof msg.title === 'string' ? msg.title : '', Date.now());
+        }
+      } else if (isLoading) {
+        lastHistoryKey = '';
       }
 
       const progress = typeof msg.progress === 'number' ? msg.progress : (isLoading ? 10 : 100);
@@ -1314,6 +1367,7 @@ function showFavoritesDropdown() {
     clearTimeout(favBlurTimeout);
     favBlurTimeout = null;
   }
+  hideHistoryDropdown();
   renderFavoritesList();
   favDropdown.style.display = 'block';
 }
@@ -1322,21 +1376,51 @@ function hideFavoritesDropdown() {
   favDropdown.style.display = 'none';
 }
 
-function renderFavoritesList() {
-  favDropdown.innerHTML = '';
-  const favorites = favoriteStore.getFavorites();
+function showHistoryDropdown() {
+  hideFavoritesDropdown();
+  renderHistoryList();
+  historyDropdown.style.display = 'block';
+}
 
-  if (favorites.length === 0) {
-    const emptyRow = document.createElement('div');
-    emptyRow.style.padding = '12px 16px';
-    emptyRow.style.fontSize = '13px';
-    emptyRow.style.color = '#8e8e93';
-    emptyRow.style.textAlign = 'center';
-    emptyRow.textContent = 'Favori site bulunmuyor';
-    favDropdown.appendChild(emptyRow);
-    return;
+function hideHistoryDropdown() {
+  historyDropdown.style.display = 'none';
+}
+
+historyBtn.addEventListener('click', () => {
+  if (historyDropdown.style.display !== 'none') {
+    hideHistoryDropdown();
+  } else {
+    showHistoryDropdown();
   }
+});
 
+historyStore.subscribe(() => {
+  if (historyDropdown.style.display !== 'none') {
+    renderHistoryList();
+  }
+});
+
+function extractHost(url: string): string {
+  try {
+    const u = url.includes('://') ? url : `https://${url}`;
+    return new URL(u).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function appendEmptyRow(container: HTMLElement, text: string, id?: string) {
+  const emptyRow = document.createElement('div');
+  if (id) emptyRow.id = id;
+  emptyRow.style.padding = '12px 16px';
+  emptyRow.style.fontSize = '13px';
+  emptyRow.style.color = '#8e8e93';
+  emptyRow.style.textAlign = 'center';
+  emptyRow.textContent = text;
+  container.appendChild(emptyRow);
+}
+
+function appendHeaderRow(container: HTMLElement, text: string) {
   const header = document.createElement('div');
   header.style.padding = '6px 14px 4px 14px';
   header.style.fontSize = '11px';
@@ -1344,114 +1428,212 @@ function renderFavoritesList() {
   header.style.textTransform = 'uppercase';
   header.style.letterSpacing = '0.5px';
   header.style.color = '#8e8e93';
-  header.textContent = 'Favoriler';
-  favDropdown.appendChild(header);
+  header.textContent = text;
+  container.appendChild(header);
+}
 
-  for (const item of favorites) {
-    const row = document.createElement('div');
-    row.className = 'fav-item';
-    row.style.display = 'flex';
-    row.style.alignItems = 'center';
-    row.style.gap = '12px';
-    row.style.padding = '10px 14px';
-    row.style.cursor = 'pointer';
-    row.style.borderBottom = '1px solid #28282b';
+function createSiteRow(
+  className: string,
+  url: string,
+  title: string,
+  subText: string,
+  onSelect: () => void,
+  onDelete?: () => void
+): HTMLDivElement {
+  const row = document.createElement('div');
+  row.className = className;
+  row.style.display = 'flex';
+  row.style.alignItems = 'center';
+  row.style.gap = '12px';
+  row.style.padding = '10px 14px';
+  row.style.cursor = 'pointer';
+  row.style.borderBottom = '1px solid #28282b';
 
-    row.addEventListener('pointerenter', () => {
-      row.style.backgroundColor = '#2c2c2e';
-    });
-    row.addEventListener('pointerleave', () => {
-      row.style.backgroundColor = 'transparent';
-    });
+  row.addEventListener('pointerenter', () => {
+    row.style.backgroundColor = '#2c2c2e';
+  });
+  row.addEventListener('pointerleave', () => {
+    row.style.backgroundColor = 'transparent';
+  });
 
-    let host = '';
-    try {
-      const u = item.url.includes('://') ? item.url : `https://${item.url}`;
-      host = new URL(u).hostname;
-    } catch {
-      host = item.url;
-    }
+  const host = extractHost(url);
+  const iconContainer = document.createElement('div');
+  iconContainer.style.width = '28px';
+  iconContainer.style.height = '28px';
+  iconContainer.style.borderRadius = '50%';
+  iconContainer.style.background = '#2c2c2e';
+  iconContainer.style.display = 'flex';
+  iconContainer.style.alignItems = 'center';
+  iconContainer.style.justifyContent = 'center';
+  iconContainer.style.flexShrink = '0';
+  iconContainer.style.overflow = 'hidden';
 
-    const iconContainer = document.createElement('div');
-    iconContainer.style.width = '28px';
-    iconContainer.style.height = '28px';
-    iconContainer.style.borderRadius = '50%';
-    iconContainer.style.background = '#2c2c2e';
-    iconContainer.style.display = 'flex';
-    iconContainer.style.alignItems = 'center';
-    iconContainer.style.justifyContent = 'center';
-    iconContainer.style.flexShrink = '0';
-    iconContainer.style.overflow = 'hidden';
+  const initial = (title || host || '?').trim().charAt(0).toUpperCase();
+  const img = document.createElement('img');
+  img.src = `https://${host}/favicon.ico`;
+  img.alt = initial;
+  img.style.width = '16px';
+  img.style.height = '16px';
+  img.style.objectFit = 'contain';
+  img.onerror = () => {
+    iconContainer.innerHTML = '';
+    const badge = document.createElement('span');
+    badge.textContent = initial;
+    badge.style.fontSize = '12px';
+    badge.style.fontWeight = 'bold';
+    badge.style.color = '#ffffff';
+    iconContainer.appendChild(badge);
+  };
+  iconContainer.appendChild(img);
+  row.appendChild(iconContainer);
 
-    const initial = (item.title || host || '?').trim().charAt(0).toUpperCase();
+  const textCol = document.createElement('div');
+  textCol.style.display = 'flex';
+  textCol.style.flexDirection = 'column';
+  textCol.style.minWidth = '0';
+  textCol.style.flex = '1';
 
-    const img = document.createElement('img');
-    img.src = `https://${host}/favicon.ico`;
-    img.alt = initial;
-    img.style.width = '16px';
-    img.style.height = '16px';
-    img.style.objectFit = 'contain';
+  const titleSpan = document.createElement('span');
+  titleSpan.textContent = title || host || url;
+  titleSpan.style.color = '#ffffff';
+  titleSpan.style.fontSize = '14px';
+  titleSpan.style.fontWeight = '500';
+  titleSpan.style.overflow = 'hidden';
+  titleSpan.style.textOverflow = 'ellipsis';
+  titleSpan.style.whiteSpace = 'nowrap';
+  textCol.appendChild(titleSpan);
 
-    img.onerror = () => {
-      iconContainer.innerHTML = '';
-      const badge = document.createElement('span');
-      badge.textContent = initial;
-      badge.style.fontSize = '12px';
-      badge.style.fontWeight = 'bold';
-      badge.style.color = '#ffffff';
-      iconContainer.appendChild(badge);
-    };
+  if (subText) {
+    const urlSpan = document.createElement('span');
+    urlSpan.textContent = subText;
+    urlSpan.style.color = '#8e8e93';
+    urlSpan.style.fontSize = '11px';
+    urlSpan.style.overflow = 'hidden';
+    urlSpan.style.textOverflow = 'ellipsis';
+    urlSpan.style.whiteSpace = 'nowrap';
+    textCol.appendChild(urlSpan);
+  }
+  row.appendChild(textCol);
 
-    iconContainer.appendChild(img);
-    row.appendChild(iconContainer);
-
-    const textCol = document.createElement('div');
-    textCol.style.display = 'flex';
-    textCol.style.flexDirection = 'column';
-    textCol.style.minWidth = '0';
-    textCol.style.flex = '1';
-
-    const titleSpan = document.createElement('span');
-    titleSpan.textContent = item.title || host || item.url;
-    titleSpan.style.color = '#ffffff';
-    titleSpan.style.fontSize = '14px';
-    titleSpan.style.fontWeight = '500';
-    titleSpan.style.overflow = 'hidden';
-    titleSpan.style.textOverflow = 'ellipsis';
-    titleSpan.style.whiteSpace = 'nowrap';
-    textCol.appendChild(titleSpan);
-
-    if (item.url) {
-      const urlSpan = document.createElement('span');
-      urlSpan.textContent = host || item.url;
-      urlSpan.style.color = '#8e8e93';
-      urlSpan.style.fontSize = '11px';
-      urlSpan.style.overflow = 'hidden';
-      urlSpan.style.textOverflow = 'ellipsis';
-      urlSpan.style.whiteSpace = 'nowrap';
-      textCol.appendChild(urlSpan);
-    }
-
-    row.appendChild(textCol);
-
-    row.addEventListener('click', (e) => {
+  if (onDelete) {
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'history-del-btn';
+    delBtn.textContent = '×';
+    delBtn.style.background = 'transparent';
+    delBtn.style.border = 'none';
+    delBtn.style.color = '#8e8e93';
+    delBtn.style.fontSize = '18px';
+    delBtn.style.lineHeight = '1';
+    delBtn.style.padding = '4px 8px';
+    delBtn.style.cursor = 'pointer';
+    delBtn.style.flexShrink = '0';
+    delBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (favBlurTimeout) {
-        clearTimeout(favBlurTimeout);
-        favBlurTimeout = null;
-      }
-      conn.sendJson({ t: 'nav', url: item.url });
-      hideFavoritesDropdown();
-      urlInput.value = item.url;
-      currentUrl = item.url;
-      currentTitle = item.title || item.url;
-      updateFavBtn(item.url);
-      urlInput.blur();
+      onDelete();
     });
+    row.appendChild(delBtn);
+  }
 
+  row.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelect();
+  });
+
+  return row;
+}
+
+function renderFavoritesList() {
+  favDropdown.innerHTML = '';
+  const favorites = favoriteStore.getFavorites();
+
+  if (favorites.length === 0) {
+    appendEmptyRow(favDropdown, 'Favori site bulunmuyor');
+    return;
+  }
+
+  appendHeaderRow(favDropdown, 'Favoriler');
+
+  for (const item of favorites) {
+    const host = extractHost(item.url);
+    const row = createSiteRow(
+      'fav-item',
+      item.url,
+      item.title || host || item.url,
+      host || item.url,
+      () => {
+        if (favBlurTimeout) {
+          clearTimeout(favBlurTimeout);
+          favBlurTimeout = null;
+        }
+        conn.sendJson({ t: 'nav', url: item.url });
+        hideFavoritesDropdown();
+        urlInput.value = item.url;
+        currentUrl = item.url;
+        currentTitle = item.title || item.url;
+        updateFavBtn(item.url);
+        urlInput.blur();
+      }
+    );
     favDropdown.appendChild(row);
   }
+}
+
+function renderHistoryList() {
+  historyDropdown.innerHTML = '';
+  const history = historyStore.getHistory();
+
+  if (history.length === 0) {
+    appendEmptyRow(historyDropdown, trStr.historyEmpty, 'history-empty');
+    return;
+  }
+
+  appendHeaderRow(historyDropdown, trStr.history);
+
+  const now = Date.now();
+  for (const item of history) {
+    const host = extractHost(item.url);
+    const rel = formatRelativeTime(item.t, now);
+    const sub = host ? `${host} · ${rel}` : rel;
+    const row = createSiteRow(
+      'history-item',
+      item.url,
+      item.title || host || item.url,
+      sub,
+      () => {
+        conn.sendJson({ t: 'nav', url: item.url });
+        hideHistoryDropdown();
+        urlInput.value = item.url;
+        currentUrl = item.url;
+        currentTitle = item.title || item.url;
+        updateFavBtn(item.url);
+      },
+      () => {
+        historyStore.remove(item.url);
+      }
+    );
+    historyDropdown.appendChild(row);
+  }
+
+  const clearHistBtn = document.createElement('button');
+  clearHistBtn.id = 'btn-clear-history';
+  clearHistBtn.type = 'button';
+  clearHistBtn.textContent = trStr.clearHistory;
+  clearHistBtn.style.width = '100%';
+  clearHistBtn.style.padding = '10px 14px';
+  clearHistBtn.style.background = 'transparent';
+  clearHistBtn.style.border = 'none';
+  clearHistBtn.style.color = '#ff453a';
+  clearHistBtn.style.fontSize = '13px';
+  clearHistBtn.style.fontWeight = '600';
+  clearHistBtn.style.cursor = 'pointer';
+  armConfirm(clearHistBtn, trStr.tapAgain, () => {
+    historyStore.clear();
+    hideHistoryDropdown();
+  });
+  historyDropdown.appendChild(clearHistBtn);
 }
 
 urlInput.addEventListener('focus', () => {
@@ -1495,6 +1677,9 @@ document.addEventListener('pointerdown', (e) => {
   const target = e.target as Node;
   if (favDropdown.style.display !== 'none' && !favDropdown.contains(target) && target !== urlInput) {
     hideFavoritesDropdown();
+  }
+  if (historyDropdown.style.display !== 'none' && !historyDropdown.contains(target) && !historyBtn.contains(target)) {
+    hideHistoryDropdown();
   }
 });
 

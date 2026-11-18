@@ -82,6 +82,45 @@ private const val FOCUS_SCRIPT = """
         return null;
     }
 
+    // Reads only the start of a response: video segments (often 1-2 MB) are not decoded as
+    // text, which cost the page main thread and memory on every segment. A playlist
+    // (#EXTM3U) is small and is read whole to tell a master playlist from a media one.
+    function sniffResponse(c, targetUrl) {
+        if (!c.body || !c.body.getReader || !window.TextDecoder) {
+            c.text().then(function(text) {
+                var k = manifestKind(text);
+                if (k) reportMedia(targetUrl, k);
+            }).catch(function() {});
+            return;
+        }
+        var reader = c.body.getReader();
+        var dec = new TextDecoder();
+        reader.read().then(function(r) {
+            var bytes = r.value || new Uint8Array(0);
+            var head = dec.decode(bytes.subarray(0, Math.min(1024, bytes.length)));
+            if (head.indexOf('#EXTM3U') !== 0 || r.done) {
+                reader.cancel();
+                var k = manifestKind(head);
+                if (k) reportMedia(targetUrl, k);
+                return;
+            }
+            var text = dec.decode(bytes, { stream: true });
+            function more() {
+                return reader.read().then(function(n) {
+                    if (n.done || text.length > 2097152) {
+                        reader.cancel();
+                        var k = manifestKind(text);
+                        if (k) reportMedia(targetUrl, k);
+                        return;
+                    }
+                    text += dec.decode(n.value, { stream: true });
+                    return more();
+                });
+            }
+            return more();
+        }).catch(function() {});
+    }
+
     function reportMedia(url, kind) {
         if (!url || typeof url !== 'string') return;
         if (reportedMediaUrls[url]) return;
@@ -158,11 +197,10 @@ private const val FOCUS_SCRIPT = """
                             var clNum = cl ? parseInt(cl, 10) : 0;
                             if (!cl || isNaN(clNum) || clNum < 2097152) {
                                 var targetUrl = res.url || (typeof input === 'string' ? input : (input && input.url ? input.url : ''));
-                                if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0)) {
-                                    res.clone().text().then(function(text) {
-                                        var k = manifestKind(text);
-                                        if (k) reportMedia(targetUrl, k);
-                                    }).catch(function() {});
+                                var ct = (res.headers && res.headers.get('content-type')) || '';
+                                if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0) &&
+                                        !/^(video|audio|image|font)\//i.test(ct)) {
+                                    sniffResponse(res.clone(), targetUrl);
                                 }
                             }
                         }
@@ -926,6 +964,13 @@ class BrowserActivity : Activity() {
         }
     }
 
+    /** Hides codecs this TV can only decode in software (see CodecGate). Computed once. */
+    private val codecGateScript: String? by lazy {
+        val prefixes = com.phantom.web.CodecGate.blockedPrefixes()
+        Log.i("PHANTOM", "CODEC_GATE blocked=${prefixes.joinToString(",").ifEmpty { "none" }}")
+        com.phantom.web.CodecGate.script(prefixes)
+    }
+
     private fun checkWebViewVersionOnce() {
         try {
             val pkg = WebView.getCurrentWebViewPackage()
@@ -1476,6 +1521,7 @@ class BrowserActivity : Activity() {
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, FOCUS_SCRIPT, setOf("*"))
+            codecGateScript?.let { WebViewCompat.addDocumentStartJavaScript(wv, it, setOf("*")) }
             if (adblockCss.isNotEmpty()) {
                 val escapedCss = org.json.JSONObject.quote(adblockCss)
                 val adblockStartScript = """
@@ -1627,6 +1673,7 @@ class BrowserActivity : Activity() {
                 updateQrVisibility()
                 if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                     view?.evaluateJavascript(FOCUS_SCRIPT, null)
+                    codecGateScript?.let { view?.evaluateJavascript(it, null) }
                 }
                 injectAdblockCss(view, urlStr)
                 cachedLoading = true
